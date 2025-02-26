@@ -13,7 +13,7 @@ def preprocess_text(text):
     text = re.sub(r'[^\w\s]', '', text)  # Remove punctuation
     return text
 
-doc1 = ""Renewable energy plays a crucial role in ensuring a sustainable future by reducing dependence on fossil fuels and lowering carbon emissions. Sources such as solar, wind, hydro, and geothermal energy provide eco-friendly alternatives that help combat climate change. Unlike conventional energy sources, renewables generate electricity with minimal environmental impact, making them essential for a greener planet.
+doc1 = """Renewable energy plays a crucial role in ensuring a sustainable future by reducing dependence on fossil fuels and lowering carbon emissions. Sources such as solar, wind, hydro, and geothermal energy provide eco-friendly alternatives that help combat climate change. Unlike conventional energy sources, renewables generate electricity with minimal environmental impact, making them essential for a greener planet.
 
 Solar energy converts sunlight into electricity through photovoltaic cells, while wind energy harnesses air currents to power turbines. Hydropower utilizes moving water to generate electricity, and geothermal energy relies on the Earth's internal heat for power production. These sustainable energy solutions create employment opportunities, enhance energy security, and promote economic growth.
 
