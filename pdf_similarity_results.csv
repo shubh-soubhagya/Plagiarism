@@ -1,0 +1,16 @@
+File1,File2,Cosine_TFIDF,Cosine_Count,Jaccard,LCS,LSH,N-Gram
+Financial_1.pdf,Financial_2.pdf,17.24,27.85,12.11,43.1,7.81,28.29
+Financial_1.pdf,healthcare_1.pdf,20.83,32.66,12.82,41.32,13.28,27.81
+Financial_1.pdf,healthcare_2.pdf,12.98,21.07,11.11,41.37,12.5,26.0
+Financial_1.pdf,Legal_1.pdf,14.98,24.19,11.64,44.89,10.16,26.8
+Financial_1.pdf,Legal_2.pdf,25.01,37.97,10.33,44.22,10.94,25.26
+Financial_2.pdf,healthcare_1.pdf,22.96,36.17,6.7,43.2,3.91,26.69
+Financial_2.pdf,healthcare_2.pdf,19.08,30.9,8.78,43.43,5.47,25.91
+Financial_2.pdf,Legal_1.pdf,21.56,34.03,12.04,43.1,6.25,27.92
+Financial_2.pdf,Legal_2.pdf,19.27,29.29,10.16,41.12,7.81,24.95
+healthcare_1.pdf,healthcare_2.pdf,29.84,43.95,12.75,44.57,14.84,30.94
+healthcare_1.pdf,Legal_1.pdf,22.25,35.24,7.28,42.94,3.91,26.02
+healthcare_1.pdf,Legal_2.pdf,25.61,37.98,8.12,42.34,8.59,25.31
+healthcare_2.pdf,Legal_1.pdf,23.58,36.7,9.41,42.92,6.25,29.63
+healthcare_2.pdf,Legal_2.pdf,12.97,19.56,7.04,41.89,4.69,25.16
+Legal_1.pdf,Legal_2.pdf,27.57,38.61,12.09,45.26,4.69,31.77
