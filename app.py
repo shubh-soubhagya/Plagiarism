@@ -1,36 +1,146 @@
+import os
+import re
+from PyPDF2 import PdfReader
 from plag.cosine_similarity import cosine_similarity_count, cosine_similarity_tfidf
 from plag.jaccard_similarity import jaccard_similarity
 from plag.lcs import lcs
 from plag.lsh import lsh_similarity
 from plag.n_gram_similarity import n_gram_similarity
-from collections import Counter
-import re
+from tabulate import tabulate
 import numpy as np
+from concurrent.futures import ThreadPoolExecutor
 
 # Preprocessing Function
 def preprocess_text(text):
     text = text.lower()
-    text = re.sub(r'[^\w\s]', '', text)  # Remove punctuation
+    text = re.sub(r'[^\w\s]', '', text)
     return text
 
-doc1 = """Renewable energy plays a crucial role in ensuring a sustainable future by reducing dependence on fossil fuels and lowering carbon emissions. Sources such as solar, wind, hydro, and geothermal energy provide eco-friendly alternatives that help combat climate change. Unlike conventional energy sources, renewables generate electricity with minimal environmental impact, making them essential for a greener planet.
+# Extract text from PDF
+def read_pdf_text(pdf_path):
+    reader = PdfReader(pdf_path)
+    text = ''
+    for page in reader.pages:
+        text += page.extract_text() or ''
+    return preprocess_text(text)
 
-Solar energy converts sunlight into electricity through photovoltaic cells, while wind energy harnesses air currents to power turbines. Hydropower utilizes moving water to generate electricity, and geothermal energy relies on the Earth's internal heat for power production. These sustainable energy solutions create employment opportunities, enhance energy security, and promote economic growth.
+# Get all PDF file paths
+def get_pdf_files(folder_path):
+    return [os.path.join(folder_path, f) for f in os.listdir(folder_path) if f.endswith(".pdf")]
 
-Despite their advantages, renewable energy sources face challenges such as high installation costs, storage limitations, and reliance on weather conditions. However, advancements in battery technology and smart grids are improving their efficiency and reliability. As governments and industries invest in clean energy, the transition to a sustainable future becomes more feasible. Prioritizing renewable energy adoption will help protect the environment while ensuring long-term energy stability and economic development."""
+# Similarity functions
+similarity_functions = {
+    "Cosine_TFIDF": cosine_similarity_tfidf,
+    "Cosine_Count": cosine_similarity_count,
+    "Jaccard": jaccard_similarity,
+    "LCS": lcs,
+    "LSH": lsh_similarity,
+    "NGram": n_gram_similarity
+}
 
-doc2 = """Renewable energy is essential for creating a sustainable future by reducing fossil fuel consumption and decreasing greenhouse gas emissions. Alternative energy sources like solar, wind, hydropower, and geothermal energy offer environmentally friendly solutions that help mitigate climate change. Unlike traditional energy sources, renewables generate power with minimal ecological harm, making them vital for a cleaner and healthier planet.
+# Compute similarity for a pair
+def compare_pair(i, j, file_names, texts):
+    row = {
+        "Doc 1": file_names[i],
+        "Doc 2": file_names[j]
+    }
+    scores = []
+    for name, func in similarity_functions.items():
+        score = round(func(texts[i], texts[j]) * 100, 2)
+        row[name] = score
+        scores.append(score)
+    row["Average Similarity (%)"] = round(np.mean(scores), 2)
+    return row
 
-Solar power captures sunlight using photovoltaic cells to generate electricity, while wind energy converts air movement into mechanical power. Hydropower generates electricity using flowing water, whereas geothermal energy taps into the Earth's heat for power production. These renewable technologies contribute to job creation, improve energy security, and support economic development.
+# Main comparison and table generation with threading
+def compare_all_pdfs(pdf_folder):
+    pdf_files = get_pdf_files(pdf_folder)
+    file_names = [os.path.basename(p) for p in pdf_files]
 
-Although renewable energy offers numerous benefits, it also faces obstacles such as high initial investment, energy storage issues, and dependency on weather conditions. However, technological advancements in battery storage and smart grid systems are enhancing their efficiency and reliability. As governments and corporations continue to invest in sustainable energy, the shift towards a greener future becomes increasingly achievable. Promoting renewable energy adoption will safeguard the environment while ensuring long-term energy security and economic prosperity."""
+    # Load all PDFs concurrently
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        texts = list(executor.map(read_pdf_text, pdf_files))
 
-doc1 = preprocess_text(doc1)
-doc2 = preprocess_text(doc2)
+    results = []
 
-print(f"Cosine Similarity (TF-IDF): {cosine_similarity_tfidf(doc1, doc2) * 100:.2f}%")
-print(f"Cosine Similarity (CountVectorizer): {cosine_similarity_count(doc1, doc2) * 100:.2f}%")
-print(f"Jaccard Similarity: {jaccard_similarity(doc1, doc2) * 100:.2f}%")
-print(f"LCS Similarity: {lcs(doc1, doc2) * 100:.2f}%")
-print(f"LSH Similarity: {lsh_similarity(doc1, doc2) * 100:.2f}%")
-print(f"N-Gram Similarity: {n_gram_similarity(doc1, doc2) * 100:.2f}%")
+    with ThreadPoolExecutor() as executor:
+        futures = []
+        for i in range(len(pdf_files)):
+            for j in range(i + 1, len(pdf_files)):
+                futures.append(executor.submit(compare_pair, i, j, file_names, texts))
+        for future in futures:
+            results.append(future.result())
+
+    print(tabulate(results, headers="keys", tablefmt="grid"))
+
+# Run it
+compare_all_pdfs("pdf_app_test")
+
+
+
+# import os
+# import re
+# from PyPDF2 import PdfReader
+# from plag.cosine_similarity import cosine_similarity_count, cosine_similarity_tfidf
+# from plag.jaccard_similarity import jaccard_similarity
+# from plag.lcs import lcs
+# from plag.lsh import lsh_similarity
+# from plag.n_gram_similarity import n_gram_similarity
+# from tabulate import tabulate
+# import numpy as np
+
+# # Preprocessing Function
+# def preprocess_text(text):
+#     text = text.lower()
+#     text = re.sub(r'[^\w\s]', '', text)
+#     return text
+
+# # Extract text from PDF
+# def read_pdf_text(pdf_path):
+#     reader = PdfReader(pdf_path)
+#     text = ''
+#     for page in reader.pages:
+#         text += page.extract_text() or ''
+#     return preprocess_text(text)
+
+# # Get all PDF file paths
+# def get_pdf_files(folder_path):
+#     return [os.path.join(folder_path, f) for f in os.listdir(folder_path) if f.endswith(".pdf")]
+
+# # Similarity functions
+# similarity_functions = {
+#     "Cosine_TFIDF": cosine_similarity_tfidf,
+#     "Cosine_Count": cosine_similarity_count,
+#     "Jaccard": jaccard_similarity,
+#     "LCS": lcs,
+#     "LSH": lsh_similarity,
+#     "NGram": n_gram_similarity
+# }
+
+# # Main comparison and table generation
+# def compare_all_pdfs(pdf_folder):
+#     pdf_files = get_pdf_files(pdf_folder)
+#     file_names = [os.path.basename(p) for p in pdf_files]
+#     texts = [read_pdf_text(p) for p in pdf_files]
+
+#     results = []
+
+#     for i in range(len(pdf_files)):
+#         for j in range(i + 1, len(pdf_files)):
+#             row = {
+#                 "Doc 1": file_names[i],
+#                 "Doc 2": file_names[j]
+#             }
+#             scores = []
+#             for name, func in similarity_functions.items():
+#                 score = round(func(texts[i], texts[j]) * 100, 2)
+#                 row[name] = score
+#                 scores.append(score)
+#             row["Average Similarity (%)"] = round(np.mean(scores), 2)
+#             results.append(row)
+
+#     headers = ["Doc 1", "Doc 2"] + list(similarity_functions.keys()) + ["Average Similarity (%)"]
+#     print(tabulate(results, headers="keys", tablefmt="grid"))
+
+# # Run it
+# compare_all_pdfs("pdf_app_test")
