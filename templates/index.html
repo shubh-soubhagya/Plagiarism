@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DocSimilarity - PDF Comparison Tool</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
+    <style>
+        .loader {
+            border-top-color: #3498db;
+            animation: spinner 1.5s linear infinite;
+        }
+        @keyframes spinner {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .table-container {
+            overflow-x: auto;
+        }
+        .upload-container {
+            border: 2px dashed #cbd5e0;
+            transition: border-color 0.3s;
+        }
+        .upload-container:hover {
+            border-color: #3498db;
+        }
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+        }
+        th {
+            background-color: #f8fafc;
+        }
+        tbody tr:nth-child(even) {
+            background-color: #f1f5f9;
+        }
+        .metric-table td {
+            vertical-align: top;
+            padding: 12px 15px;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Navbar -->
+    <nav class="bg-white shadow-md">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <span class="text-xl font-bold text-blue-600">DocSimilarity</span>
+                </div>
+                <div class="flex items-center">
+                    <button id="downloadBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded transition duration-300 ease-in-out hidden" disabled>
+                        Download Report
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Upload Section -->
+        <div class="bg-white shadow-md rounded-lg p-6 mb-8">
+            <h2 class="text-xl font-semibold mb-4">Upload PDF Documents</h2>
+            <div id="uploadContainer" class="upload-container rounded-lg p-8 text-center cursor-pointer">
+                <div class="mb-4">
+                    <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+                        <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                    <p class="mt-2 text-sm text-gray-600">
+                        Select multiple PDF files to upload
+                    </p>
+                    <p class="mt-1 text-xs text-gray-500">
+                        Files will be processed on the server
+                    </p>
+                </div>
+                <input id="pdfInput" type="file" multiple accept="application/pdf" class="hidden" />
+                <button id="uploadBtn" class="mt-2 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                    Select PDFs
+                </button>
+            </div>
+            
+            <!-- Processing Loader -->
+            <div id="processingLoader" class="hidden flex flex-col items-center justify-center mt-4">
+                <div class="loader ease-linear rounded-full border-4 border-t-4 border-gray-200 h-12 w-12 mb-4"></div>
+                <h2 class="text-center text-gray-600 text-xl font-semibold">Processing...</h2>
+                <p class="w-full text-center text-gray-500">This may take a while depending on the number of documents</p>
+            </div>
+        </div>
+
+        <!-- Results Section -->
+        <div id="resultsSection" class="hidden">
+            <div class="bg-white shadow-md rounded-lg p-6 mb-8">
+                <h2 class="text-xl font-semibold mb-4">Similarity Analysis Results</h2>
+                <div id="filesSummary" class="mb-4 text-sm text-gray-600"></div>
+                <div class="table-container">
+                    <table id="resultsTable" class="min-w-full bg-white border border-gray-200">
+                        <thead>
+                            <tr>
+                                <th class="border-b">Doc 1</th>
+                                <th class="border-b">Doc 2</th>
+                                <th class="border-b">Cosine_TFIDF (%)</th>
+                                <th class="border-b">Cosine_Count (%)</th>
+                                <th class="border-b">Jaccard (%)</th>
+                                <th class="border-b">LCS (%)</th>
+                                <th class="border-b">LSH (%)</th>
+                                <th class="border-b">NGram (%)</th>
+                                <th class="border-b">Average (%)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="resultsBody"></tbody>
+                    </table>
+                </div>
+                
+                <div class="flex mt-4 justify-end space-x-4">
+                    <button id="csvDownloadBtn" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition">
+                        Download CSV
+                    </button>
+                    <button id="htmlDownloadBtn" class="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 transition">
+                        Download HTML Report
+                    </button>
+                </div>
+            </div>
+
+            <!-- Metrics Explanation Section -->
+            <div class="bg-white shadow-md rounded-lg p-6">
+                <h2 class="text-xl font-semibold mb-4">Similarity Metrics Explained</h2>
+                <table class="metric-table min-w-full bg-white border border-gray-200">
+                    <thead>
+                        <tr>
+                            <th class="w-1/4 border-b">Metric</th>
+                            <th class="w-3/4 border-b">Explanation</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="border-b font-medium">Cosine TF-IDF</td>
+                            <td class="border-b">Measures similarity by treating documents as vectors, with words weighted by their importance. Higher scores indicate documents share important terms, not just common words.</td>
+                        </tr>
+                        <tr>
+                            <td class="border-b font-medium">Cosine Count</td>
+                            <td class="border-b">Similar to Cosine TF-IDF but uses raw word counts instead of weighted values. Measures how similar the word distributions are between documents.</td>
+                        </tr>
+                        <tr>
+                            <td class="border-b font-medium">Jaccard</td>
+                            <td class="border-b">Compares the shared words between documents to the total unique words in both. Focuses on word overlap regardless of frequency or order.</td>
+                        </tr>
+                        <tr>
+                            <td class="border-b font-medium">LCS (Longest Common Subsequence)</td>
+                            <td class="border-b">Finds the longest sequence of words that appear in the same order in both documents. Good for detecting large blocks of identical text.</td>
+                        </tr>
+                        <tr>
+                            <td class="border-b font-medium">LSH (Locality Sensitive Hashing)</td>
+                            <td class="border-b">Uses hashing to quickly identify similar document segments. Effective for detecting partial matches and document sections that have been copied.</td>
+                        </tr>
+                        <tr>
+                            <td class="border-b font-medium">NGram</td>
+                            <td class="border-b">Compares sequences of consecutive words (typically 3-5 words) between documents. Good for identifying phrase-level similarity and paraphrasing.</td>
+                        </tr>
+                        <tr>
+                            <td class="font-medium">Average Similarity</td>
+                            <td>The mean of all similarity metrics, giving an overall indication of document similarity. Higher percentages suggest a greater likelihood of content overlap.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // DOM Elements
+        const pdfInput = document.getElementById('pdfInput');
+        const uploadBtn = document.getElementById('uploadBtn');
+        const uploadContainer = document.getElementById('uploadContainer');
+        const processingLoader = document.getElementById('processingLoader');
+        const resultsSection = document.getElementById('resultsSection');
+        const resultsTable = document.getElementById('resultsTable');
+        const resultsBody = document.getElementById('resultsBody');
+        const filesSummary = document.getElementById('filesSummary');
+        const csvDownloadBtn = document.getElementById('csvDownloadBtn');
+        const htmlDownloadBtn = document.getElementById('htmlDownloadBtn');
+        const downloadBtn = document.getElementById('downloadBtn');
+
+        // Store analysis results
+        let analysisResults = [];
+        let analyzedFileNames = [];
+
+        // Click the upload button when the container is clicked
+        uploadContainer.addEventListener('click', () => {
+            uploadBtn.click();
+        });
+
+        // Trigger file input when upload button is clicked
+        uploadBtn.addEventListener('click', () => {
+            pdfInput.click();
+        });
+
+        // Handle file selection
+        pdfInput.addEventListener('change', async (e) => {
+            const files = e.target.files;
+            
+            // Filter for PDF files only
+            const pdfFiles = Array.from(files).filter(file => file.name.toLowerCase().endsWith('.pdf'));
+            
+            if (pdfFiles.length < 2) {
+                alert('Please select a folder with at least 2 PDF files for comparison.');
+                return;
+            }
+
+            // Show loading indicator
+            uploadContainer.classList.add('hidden');
+            processingLoader.classList.remove('hidden');
+
+            // Create FormData and append files
+            const formData = new FormData();
+            pdfFiles.forEach(file => {
+                formData.append('files[]', file);
+            });
+
+            // Send files to server for processing
+            try {
+                const response = await fetch('/api/process', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Server error');
+                }
+
+                const data = await response.json();
+                displayResults(data.results, data.fileCount, data.fileNames);
+            } catch (error) {
+                alert('Error processing files: ' + error.message);
+                // Reset UI
+                processingLoader.classList.add('hidden');
+                uploadContainer.classList.remove('hidden');
+            }
+        });
+
+        // Display the comparison results in the table
+        function displayResults(results, fileCount, fileNames) {
+            // Store results for later use
+            analysisResults = results;
+            analyzedFileNames = fileNames;
+            
+            // Update file summary
+            filesSummary.textContent = `Analyzed ${fileCount} PDF files with ${results.length} comparisons`;
+            
+            // Clear any existing results
+            resultsBody.innerHTML = '';
+            
+            // Add rows to the table
+            results.forEach(result => {
+                const row = document.createElement('tr');
+                
+                // Add cells for each column
+                row.innerHTML = `
+                    <td class="border-b">${result["Doc 1"]}</td>
+                    <td class="border-b">${result["Doc 2"]}</td>
+                    <td class="border-b">${result["Cosine_TFIDF"]}%</td>
+                    <td class="border-b">${result["Cosine_Count"]}%</td>
+                    <td class="border-b">${result["Jaccard"]}%</td>
+                    <td class="border-b">${result["LCS"]}%</td>
+                    <td class="border-b">${result["LSH"]}%</td>
+                    <td class="border-b">${result["NGram"]}%</td>
+                    <td class="border-b font-medium">${result["Average Similarity (%)"]}</td>
+                `;
+                
+                resultsBody.appendChild(row);
+            });
+            
+            // Enable download buttons
+            downloadBtn.classList.remove('hidden');
+            downloadBtn.disabled = false;
+            
+            // Hide loader and show results
+            processingLoader.classList.add('hidden');
+            resultsSection.classList.remove('hidden');
+        }
+
+        // CSV Download
+        csvDownloadBtn.addEventListener('click', async () => {
+            if (!analysisResults || analysisResults.length === 0) return;
+            
+            try {
+                const response = await fetch('/api/download/csv', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        results: analysisResults
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Error generating CSV');
+                }
+                
+                // Trigger download
+                const blob = await response.blob();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = url;
+                
+                // Get filename from Content-Disposition header or use default
+                const contentDisposition = response.headers.get('Content-Disposition');
+                let filename = 'similarity_report.csv';
+                if (contentDisposition) {
+                    const filenameMatch = contentDisposition.match(/filename="?([^"]*)"?/);
+                    if (filenameMatch && filenameMatch[1]) {
+                        filename = filenameMatch[1];
+                    }
+                }
+                
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+                
+            } catch (error) {
+                alert('Error downloading CSV: ' + error.message);
+            }
+        });
+
+        // HTML Report Download
+        htmlDownloadBtn.addEventListener('click', async () => {
+            if (!analysisResults || analysisResults.length === 0) return;
+            
+            try {
+                const response = await fetch('/api/download/html', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        results: analysisResults,
+                        fileNames: analyzedFileNames
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Error generating HTML report');
+                }
+                
+                // Trigger download
+                const blob = await response.blob();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = url;
+                
+                // Get filename from Content-Disposition header or use default
+                const contentDisposition = response.headers.get('Content-Disposition');
+                let filename = 'similarity_report.html';
+                if (contentDisposition) {
+                    const filenameMatch = contentDisposition.match(/filename="?([^"]*)"?/);
+                    if (filenameMatch && filenameMatch[1]) {
+                        filename = filenameMatch[1];
+                    }
+                }
+                
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+                
+            } catch (error) {
+                alert('Error downloading HTML report: ' + error.message);
+            }
+        });
+    </script>
+</body>
+</html>
