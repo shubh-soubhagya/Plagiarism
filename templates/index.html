@@ -5,8 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DocSimilarity - PDF Comparison Tool</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
     <style>
+        body {
+            font-family: 'Montserrat', sans-serif;
+        }
         .loader {
             border-top-color: #3498db;
             animation: spinner 1.5s linear infinite;
@@ -22,8 +26,9 @@
             border: 2px dashed #cbd5e0;
             transition: border-color 0.3s;
         }
-        .upload-container:hover {
+        .upload-container:hover, .upload-container.drag-active {
             border-color: #3498db;
+            background-color: rgba(52, 152, 219, 0.05);
         }
         th, td {
             padding: 12px 15px;
@@ -39,6 +44,30 @@
             vertical-align: top;
             padding: 12px 15px;
         }
+        .logo {
+            font-family: 'Montserrat', sans-serif;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+        .file-item {
+            background-color: #f1f5f9;
+            border-radius: 4px;
+            padding: 8px 12px;
+            margin: 4px 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .file-name {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 250px;
+        }
+        .file-list {
+            max-height: 200px;
+            overflow-y: auto;
+        }
     </style>
 </head>
 <body class="bg-gray-50 min-h-screen">
@@ -47,12 +76,7 @@
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between h-16">
                 <div class="flex items-center">
-                    <span class="text-xl font-bold text-blue-600">DocSimilarity</span>
-                </div>
-                <div class="flex items-center">
-                    <button id="downloadBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded transition duration-300 ease-in-out hidden" disabled>
-                        Download Report
-                    </button>
+                    <span class="logo text-xl text-blue-700">DocSimilarity<span class="text-gray-500 text-sm ml-1">Beta</span></span>
                 </div>
             </div>
         </div>
@@ -61,23 +85,33 @@
     <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <!-- Upload Section -->
         <div class="bg-white shadow-md rounded-lg p-6 mb-8">
-            <h2 class="text-xl font-semibold mb-4">Upload PDF Documents</h2>
-            <div id="uploadContainer" class="upload-container rounded-lg p-8 text-center cursor-pointer">
+            <div id="uploadContainer" class="upload-container rounded-lg p-8 text-center">
                 <div class="mb-4">
                     <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
                         <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
                     </svg>
                     <p class="mt-2 text-sm text-gray-600">
-                        Select multiple PDF files to upload
+                        Drag and drop PDF files here or click to select
                     </p>
                     <p class="mt-1 text-xs text-gray-500">
-                        Files will be processed on the server
+                        Select multiple PDFs for comparison
                     </p>
                 </div>
+
+                <div id="fileListContainer" class="file-list mb-4 hidden">
+                    <div class="text-left text-sm font-medium text-gray-700 mb-2">Selected Files:</div>
+                    <div id="fileList" class="text-left"></div>
+                </div>
+
                 <input id="pdfInput" type="file" multiple accept="application/pdf" class="hidden" />
-                <button id="uploadBtn" class="mt-2 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                    Select PDFs
-                </button>
+                <div class="flex justify-center gap-4">
+                    <button id="uploadBtn" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                        Select PDFs
+                    </button>
+                    <button id="scanBtn" disabled class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 opacity-50 cursor-not-allowed">
+                        Scan PDFs
+                    </button>
+                </div>
             </div>
             
             <!-- Processing Loader -->
@@ -91,7 +125,12 @@
         <!-- Results Section -->
         <div id="resultsSection" class="hidden">
             <div class="bg-white shadow-md rounded-lg p-6 mb-8">
-                <h2 class="text-xl font-semibold mb-4">Similarity Analysis Results</h2>
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-semibold">Similarity Analysis Results</h2>
+                    <button id="chatWithPdfBtn" class="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition">
+                        Chat with PDF
+                    </button>
+                </div>
                 <div id="filesSummary" class="mb-4 text-sm text-gray-600"></div>
                 <div class="table-container">
                     <table id="resultsTable" class="min-w-full bg-white border border-gray-200">
@@ -171,6 +210,7 @@
         // DOM Elements
         const pdfInput = document.getElementById('pdfInput');
         const uploadBtn = document.getElementById('uploadBtn');
+        const scanBtn = document.getElementById('scanBtn');
         const uploadContainer = document.getElementById('uploadContainer');
         const processingLoader = document.getElementById('processingLoader');
         const resultsSection = document.getElementById('resultsSection');
@@ -179,31 +219,122 @@
         const filesSummary = document.getElementById('filesSummary');
         const csvDownloadBtn = document.getElementById('csvDownloadBtn');
         const htmlDownloadBtn = document.getElementById('htmlDownloadBtn');
-        const downloadBtn = document.getElementById('downloadBtn');
+        const chatWithPdfBtn = document.getElementById('chatWithPdfBtn');
+        const fileListContainer = document.getElementById('fileListContainer');
+        const fileList = document.getElementById('fileList');
 
         // Store analysis results
         let analysisResults = [];
         let analyzedFileNames = [];
+        let selectedFiles = [];
 
-        // Click the upload button when the container is clicked
-        uploadContainer.addEventListener('click', () => {
+        // Drag and drop functionality
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            uploadContainer.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            uploadContainer.addEventListener(eventName, highlight, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            uploadContainer.addEventListener(eventName, unhighlight, false);
+        });
+
+        function highlight() {
+            uploadContainer.classList.add('drag-active');
+        }
+
+        function unhighlight() {
+            uploadContainer.classList.remove('drag-active');
+        }
+
+        uploadContainer.addEventListener('drop', handleDrop, false);
+
+        function handleDrop(e) {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            handleFiles(files);
+        }
+
+        function handleFiles(files) {
+            // Filter for PDF files only
+            const pdfFiles = Array.from(files).filter(file => file.name.toLowerCase().endsWith('.pdf'));
+            
+            if (pdfFiles.length === 0) {
+                alert('Please select PDF files for comparison.');
+                return;
+            }
+
+            // Store selected files
+            selectedFiles = pdfFiles;
+            
+            // Display selected files
+            displaySelectedFiles(pdfFiles);
+            
+            // Enable scan button if at least 2 PDFs are selected
+            scanBtn.disabled = pdfFiles.length < 2;
+            scanBtn.classList.toggle('opacity-50', pdfFiles.length < 2);
+            scanBtn.classList.toggle('cursor-not-allowed', pdfFiles.length < 2);
+        }
+
+        function displaySelectedFiles(files) {
+            if (files.length === 0) {
+                fileListContainer.classList.add('hidden');
+                return;
+            }
+            
+            fileList.innerHTML = '';
+            files.forEach(file => {
+                const fileItem = document.createElement('div');
+                fileItem.className = 'file-item';
+                fileItem.innerHTML = `
+                    <span class="file-name">${file.name}</span>
+                    <span class="text-xs text-gray-500">${formatFileSize(file.size)}</span>
+                `;
+                fileList.appendChild(fileItem);
+            });
+            
+            fileListContainer.classList.remove('hidden');
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        // Click the upload button when clicking the upload area
+        uploadContainer.addEventListener('click', (e) => {
+            // Prevent clicking on the file list from triggering file selection
+            if (e.target.closest('#fileListContainer')) return;
+            // Also prevent triggering when clicking on the scan button
+            if (e.target.closest('#scanBtn')) return;
             uploadBtn.click();
         });
 
         // Trigger file input when upload button is clicked
-        uploadBtn.addEventListener('click', () => {
+        uploadBtn.addEventListener('click', (e) => {
+            e.stopPropagation(); // Prevent event from bubbling to the container
             pdfInput.click();
         });
 
         // Handle file selection
-        pdfInput.addEventListener('change', async (e) => {
-            const files = e.target.files;
-            
-            // Filter for PDF files only
-            const pdfFiles = Array.from(files).filter(file => file.name.toLowerCase().endsWith('.pdf'));
-            
-            if (pdfFiles.length < 2) {
-                alert('Please select a folder with at least 2 PDF files for comparison.');
+        pdfInput.addEventListener('change', (e) => {
+            handleFiles(e.target.files);
+        });
+
+        // Handle scan button click
+        scanBtn.addEventListener('click', async () => {
+            if (selectedFiles.length < 2) {
+                alert('Please select at least 2 PDF files for comparison.');
                 return;
             }
 
@@ -213,7 +344,7 @@
 
             // Create FormData and append files
             const formData = new FormData();
-            pdfFiles.forEach(file => {
+            selectedFiles.forEach(file => {
                 formData.append('files[]', file);
             });
 
@@ -270,10 +401,6 @@
                 
                 resultsBody.appendChild(row);
             });
-            
-            // Enable download buttons
-            downloadBtn.classList.remove('hidden');
-            downloadBtn.disabled = false;
             
             // Hide loader and show results
             processingLoader.classList.add('hidden');
@@ -373,6 +500,11 @@
             } catch (error) {
                 alert('Error downloading HTML report: ' + error.message);
             }
+        });
+
+        // Chat with PDF button (non-functional)
+        chatWithPdfBtn.addEventListener('click', () => {
+            alert('Chat with PDF feature coming soon!');
         });
     </script>
 </body>
